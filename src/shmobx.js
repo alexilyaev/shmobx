@@ -1,8 +1,8 @@
 // const arrayTag = '[object Array]';
 // const funcTag = '[object Function]';
 // const numberTag = '[object Number]';
-const objectTag = '[object Object]';
 // const stringTag = '[object String]';
+const objectTag = '[object Object]';
 
 function isObjectLike(value) {
   return value !== null && typeof value === 'object';
@@ -17,8 +17,8 @@ function isPlainObject(value) {
 //----------------------------------------------------------
 
 class Shmobx {
-  registerMode = false;
-  registerHandler = null;
+  isRegisterMode = false;
+  currRegisterHandler = null;
 
   _setupObservableObj(obj) {
     const keys = Object.keys(obj);
@@ -32,13 +32,13 @@ class Shmobx {
 
       Object.defineProperty(obj, key, {
         get: () => {
-          if (this.registerMode) {
+          if (this.isRegisterMode) {
             if (!obj._handlers[key]) {
               obj._handlers[key] = [];
             }
 
-            if (!obj._handlers[key].includes(this.registerHandler)) {
-              obj._handlers[key].push(this.registerHandler);
+            if (!obj._handlers[key].includes(this.currRegisterHandler)) {
+              obj._handlers[key].push(this.currRegisterHandler);
             }
           }
 
@@ -69,13 +69,13 @@ class Shmobx {
   }
 
   autorun(func) {
-    this.registerMode = true;
-    this.registerHandler = func;
+    this.isRegisterMode = true;
+    this.currRegisterHandler = func;
 
     func();
 
-    this.registerMode = false;
-    this.registerHandler = null;
+    this.isRegisterMode = false;
+    this.currRegisterHandler = null;
   }
 
   reset() {}

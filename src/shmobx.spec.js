@@ -1,8 +1,8 @@
-const m = require('./shmobx');
+const shmobx = require('./shmobx');
 
 describe('Index', () => {
   beforeEach(() => {
-    m.reset();
+    shmobx.reset();
   });
 
   it('should add getters/setters for object properties', () => {
@@ -11,7 +11,7 @@ describe('Index', () => {
       name: 'John'
     };
 
-    const obs = m.observable(data);
+    const obs = shmobx.observable(data);
 
     expect(obs.count).toBe(data.count);
     expect(obs.name).toBe(data.name);
@@ -29,13 +29,13 @@ describe('Index', () => {
       name: 'John'
     };
 
-    const obs = m.observable(data);
+    const obs = shmobx.observable(data);
 
     const handler = jest.fn(() => {
       return data.count;
     });
 
-    m.autorun(handler);
+    shmobx.autorun(handler);
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(obs._handlers.count).toHaveLength(1);
