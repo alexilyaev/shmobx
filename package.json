@@ -1,10 +1,11 @@
 {
   "name": "shmobx",
   "version": "1.0.0",
-  "description": "Find stylelint rules that you don't have in your config",
-  "main": "index.js",
+  "description": "Building MobX from scratch for learning purposes",
+  "main": "lib/shmobx.js",
+  "umd:main": "lib/shmobx.umd.js",
+  "module": "lib/shmobx.module.js",
   "scripts": {
-    "start": "node index.js",
     "base-prettier": "prettier --ignore-path .gitignore",
     "base-eslint": "eslint --ignore-path .gitignore",
     "format": "npm run base-eslint -- --fix \"**/*.js\" && npm run base-prettier -- --write \"**/*.js\"",
@@ -13,8 +14,7 @@
     "lint": "npm run lint-prettier && npm run lint-eslint",
     "test": "jest ./src",
     "test-watch": "npm run test -- --watch --notify",
-    "test-coverage": "npm run test -- --coverage",
-    "test-ci": "npm run test-coverage && npm run test-e2e"
+    "test-coverage": "npm run test -- --coverage"
   },
   "husky": {
     "hooks": {
