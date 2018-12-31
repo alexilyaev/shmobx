@@ -16,39 +16,72 @@ function isPlainObject(value) {
 
 //----------------------------------------------------------
 
-const shmobx = (() => {
-  function observable(data) {
-    if (isPlainObject(data)) {
-      const keys = Object.keys(data);
+class Shmobx {
+  registerMode = false;
+  registerHandler = null;
 
-      keys.forEach(key => {
-        const _key = '_' + key;
+  _setupObservableObj(obj) {
+    const keys = Object.keys(obj);
 
-        data[_key] = data[key];
+    obj._handlers = {};
 
-        Object.defineProperty(data, key, {
-          get() {
-            return this[_key];
+    keys.forEach(key => {
+      const _key = '_' + key;
+
+      obj[_key] = obj[key];
+
+      Object.defineProperty(obj, key, {
+        get: () => {
+          if (this.registerMode) {
+            if (!obj._handlers[key]) {
+              obj._handlers[key] = [];
+            }
+
+            if (!obj._handlers[key].includes(this.registerHandler)) {
+              obj._handlers[key].push(this.registerHandler);
+            }
           }
-        });
 
-        Object.defineProperty(data, key, {
-          set(value) {
-            this[_key] = value;
-          }
-        });
+          return obj[_key];
+        }
       });
 
-      return data;
+      Object.defineProperty(obj, key, {
+        set: value => {
+          obj[_key] = value;
+
+          if (obj._handlers[key]) {
+            obj._handlers[key].forEach(handler => handler());
+          }
+        }
+      });
+    });
+
+    return obj;
+  }
+
+  observable(data) {
+    if (isPlainObject(data)) {
+      return this._setupObservableObj(data);
     }
 
     return data;
   }
 
-  return {
-    observable
-  };
-})();
+  autorun(func) {
+    this.registerMode = true;
+    this.registerHandler = func;
+
+    func();
+
+    this.registerMode = false;
+    this.registerHandler = null;
+  }
+
+  reset() {}
+}
+
+const shmobx = new Shmobx();
 
 if (typeof window !== 'undefined') {
   window.shmobx = shmobx;

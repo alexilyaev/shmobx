@@ -1,0 +1,18 @@
+{
+  "presets": [
+    [
+      "@babel/preset-env",
+      {
+        "modules": false,
+        "useBuiltIns": false,
+        "debug": false
+      }
+    ]
+  ],
+  "plugins": [
+    "@babel/plugin-transform-destructuring",
+    "@babel/plugin-proposal-object-rest-spread",
+    // Enable loose mode to use assignment instead of defineProperty
+    ["@babel/plugin-proposal-class-properties", { "loose": true }]
+  ]
+}
