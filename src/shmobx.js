@@ -17,74 +17,70 @@ function isPlainObject(value) {
 //----------------------------------------------------------
 
 class Shmobx {
-  isRegisterMode = false;
-  currRegisterHandler = null;
+  static isRegisterMode = false;
+  static currRegisterHandler = null;
+  static handlers = new WeakMap();
 
-  _setupObservableObj(obj) {
-    const keys = Object.keys(obj);
+  static _setupObservableObj(obj) {
+    return new Proxy(obj, {
+      get(target, key) {
+        // console.log('GET', key);
 
-    obj._handlers = {};
+        if (Shmobx.isRegisterMode) {
+          let targetHandlers = Shmobx.handlers.get(obj);
 
-    keys.forEach(key => {
-      const _key = '_' + key;
-
-      obj[_key] = obj[key];
-
-      Object.defineProperty(obj, key, {
-        get: () => {
-          if (this.isRegisterMode) {
-            if (!obj._handlers[key]) {
-              obj._handlers[key] = [];
-            }
-
-            if (!obj._handlers[key].includes(this.currRegisterHandler)) {
-              obj._handlers[key].push(this.currRegisterHandler);
-            }
+          if (!targetHandlers) {
+            targetHandlers = Shmobx.handlers.set(obj, {}).get(obj);
+          }
+          if (!targetHandlers[key]) {
+            targetHandlers[key] = new Set();
           }
 
-          return obj[_key];
+          targetHandlers[key].add(Shmobx.currRegisterHandler);
         }
-      });
 
-      Object.defineProperty(obj, key, {
-        set: value => {
-          obj[_key] = value;
+        return Reflect.get(...arguments);
+      },
 
-          if (obj._handlers[key]) {
-            obj._handlers[key].forEach(handler => handler());
-          }
+      set(target, key) {
+        // console.log('SET', key, value);
+
+        const res = Reflect.set(...arguments);
+
+        const targetHandlers = Shmobx.handlers.get(obj);
+
+        if (targetHandlers && targetHandlers[key]) {
+          targetHandlers[key].forEach(handler => handler());
         }
-      });
+
+        return res;
+      }
     });
-
-    return obj;
   }
 
-  observable(data) {
+  static observable(data) {
     if (isPlainObject(data)) {
-      return this._setupObservableObj(data);
+      return Shmobx._setupObservableObj(data);
     }
 
     return data;
   }
 
-  autorun(func) {
-    this.isRegisterMode = true;
-    this.currRegisterHandler = func;
+  static autorun(func) {
+    Shmobx.isRegisterMode = true;
+    Shmobx.currRegisterHandler = func;
 
     func();
 
-    this.isRegisterMode = false;
-    this.currRegisterHandler = null;
+    Shmobx.isRegisterMode = false;
+    Shmobx.currRegisterHandler = null;
   }
-
-  reset() {}
 }
 
-const shmobx = new Shmobx();
+const shmobx = Shmobx;
 
 if (typeof window !== 'undefined') {
   window.shmobx = shmobx;
+} else if (typeof module !== 'undefined') {
+  module.exports = shmobx;
 }
-
-module.exports = shmobx;

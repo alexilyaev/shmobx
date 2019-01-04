@@ -1,50 +1,95 @@
-const shmobx = require('./shmobx');
+// const shmobx = require('./shmobx');
+const shmobx = require('mobx');
 
 describe('Index', () => {
-  beforeEach(() => {
-    shmobx.reset();
+  describe('basic', () => {
+    it('should add getters/setters for object properties', () => {
+      const initial = {
+        count: 1,
+        name: 'John'
+      };
+      const data = shmobx.observable(initial);
+
+      expect(data.count).toBe(initial.count);
+      expect(data.name).toBe(initial.name);
+
+      data.count = 2;
+      data.name = 'Robin';
+
+      expect(data.count).toBe(2);
+      expect(data.name).toBe('Robin');
+    });
   });
 
-  it('should add getters/setters for object properties', () => {
-    const data = {
-      count: 1,
-      name: 'John'
-    };
+  describe('autorun', () => {
+    it('should register autorun handlers', () => {
+      const initial = {
+        count: 1,
+        name: 'John'
+      };
+      const data = shmobx.observable(initial);
 
-    const obs = shmobx.observable(data);
+      const handler = jest.fn(() => {
+        return data.count;
+      });
 
-    expect(obs.count).toBe(data.count);
-    expect(obs.name).toBe(data.name);
+      shmobx.autorun(handler);
 
-    obs.count = 2;
-    obs.name = 'Robin';
+      expect(handler).toHaveBeenCalledTimes(1);
 
-    expect(obs.count).toBe(2);
-    expect(obs.name).toBe('Robin');
-  });
+      data.name = 'Robin';
+      expect(handler).toHaveBeenCalledTimes(1);
 
-  it('should register reaction handlers using autorun and call them on changes', () => {
-    const data = {
-      count: 1,
-      name: 'John'
-    };
-
-    const obs = shmobx.observable(data);
-
-    const handler = jest.fn(() => {
-      return data.count;
+      data.count = 2;
+      expect(handler).toHaveBeenCalledTimes(2);
     });
 
-    shmobx.autorun(handler);
+    it('should register handlers for a non existing property', () => {
+      const data = shmobx.observable({});
 
-    expect(handler).toHaveBeenCalledTimes(1);
-    expect(obs._handlers.count).toHaveLength(1);
-    expect(obs._handlers.count[0]).toBe(handler);
+      const handler = jest.fn(() => {
+        return data.count;
+      });
 
-    obs.name = 'Robin';
-    expect(handler).toHaveBeenCalledTimes(1);
+      shmobx.autorun(handler);
 
-    obs.count = 2;
-    expect(handler).toHaveBeenCalledTimes(2);
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      data.name = 'Robin';
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      data.count = 2;
+      expect(handler).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('reaction', () => {
+    it('should register reaction handlers', () => {
+      const initial = {
+        count: 1,
+        name: 'John'
+      };
+      const data = shmobx.observable(initial);
+
+      const dataFunc = jest.fn(() => {
+        return data.count;
+      });
+      const handler = jest.fn(count => {
+        expect(count).toBe(2);
+      });
+
+      shmobx.reaction(dataFunc, handler);
+
+      expect(dataFunc).toHaveBeenCalledTimes(1);
+      expect(handler).not.toHaveBeenCalled();
+
+      data.name = 'Robin';
+      expect(dataFunc).toHaveBeenCalledTimes(1);
+      expect(handler).not.toHaveBeenCalled();
+
+      data.count = 2;
+      expect(dataFunc).toHaveBeenCalledTimes(2);
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
   });
 });
