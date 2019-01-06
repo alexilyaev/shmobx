@@ -16,10 +16,57 @@ function isPlainObject(value) {
 
 //----------------------------------------------------------
 
+class Events {
+  /**
+   * Abstract Structure:
+   * {
+   *   [{ ... }]: {
+   *     [key]: [handler, handler, ...],
+   *     ...
+   *   },
+   *   ...
+   * }
+   */
+  static listeners = new Map();
+
+  static on(target, key, handler) {
+    if (!Events.listeners.has(target)) {
+      Events.listeners.set(target, new Map());
+    }
+    if (!Events.listeners.get(target).has(key)) {
+      Events.listeners.get(target).set(key, new Set());
+    }
+
+    Events.listeners
+      .get(target)
+      .get(key)
+      .add(handler);
+  }
+
+  static dispatch(target, key) {
+    const targetMap = Events.listeners.get(target);
+
+    if (!targetMap || !targetMap.get(key)) {
+      return;
+    }
+
+    Events.listeners
+      .get(target)
+      .get(key)
+      .forEach(handler => handler());
+  }
+
+  static removeListener(target, key, handler) {
+    Events.listeners
+      .get(target)
+      .get(key)
+      .delete(handler);
+  }
+}
+
 class Shmobx {
   static isRegisterMode = false;
-  static currRegisterHandler = null;
-  static handlers = new WeakMap();
+  static currRegisterMap = new Map();
 
   static _setupObservableObj(obj) {
     return new Proxy(obj, {
@@ -27,16 +74,15 @@ class Shmobx {
         // console.log('GET', key);
 
         if (Shmobx.isRegisterMode) {
-          let targetHandlers = Shmobx.handlers.get(obj);
+          let targetTrackedKeys = Shmobx.currRegisterMap.get(target);
 
-          if (!targetHandlers) {
-            targetHandlers = Shmobx.handlers.set(obj, {}).get(obj);
-          }
-          if (!targetHandlers[key]) {
-            targetHandlers[key] = new Set();
+          if (!targetTrackedKeys) {
+            targetTrackedKeys = Shmobx.currRegisterMap
+              .set(target, new Set())
+              .get(target);
           }
 
-          targetHandlers[key].add(Shmobx.currRegisterHandler);
+          targetTrackedKeys.add(key);
         }
 
         return Reflect.get(...arguments);
@@ -47,11 +93,7 @@ class Shmobx {
 
         const res = Reflect.set(...arguments);
 
-        const targetHandlers = Shmobx.handlers.get(obj);
-
-        if (targetHandlers && targetHandlers[key]) {
-          targetHandlers[key].forEach(handler => handler());
-        }
+        Events.dispatch(target, key);
 
         return res;
       }
@@ -67,20 +109,46 @@ class Shmobx {
   }
 
   static autorun(func) {
-    Shmobx.isRegisterMode = true;
-    Shmobx.currRegisterHandler = func;
+    function handler() {
+      Shmobx.isRegisterMode = true;
 
-    func();
+      func();
 
-    Shmobx.isRegisterMode = false;
-    Shmobx.currRegisterHandler = null;
+      Shmobx.isRegisterMode = false;
+
+      // Add listeners
+      Shmobx.currRegisterMap.forEach((trackedKeys, target) => {
+        trackedKeys.forEach(key => {
+          Events.on(target, key, handler);
+        });
+      });
+
+      // Remove no longer needed listeners
+      if (handler.prevRegisterMap) {
+        handler.prevRegisterMap.forEach((prevTrackedKeys, prevTarget) => {
+          const currTargetTrackedKeys = Shmobx.currRegisterMap.get(prevTarget);
+
+          prevTrackedKeys.forEach(prevTrackedKey => {
+            if (
+              !currTargetTrackedKeys ||
+              !currTargetTrackedKeys.has(prevTrackedKey)
+            ) {
+              Events.removeListener(prevTarget, prevTrackedKey, handler);
+            }
+          });
+        });
+      }
+
+      handler.prevRegisterMap = Shmobx.currRegisterMap;
+      Shmobx.currRegisterMap = new Map();
+    }
+
+    handler();
   }
 }
 
-const shmobx = Shmobx;
-
 if (typeof window !== 'undefined') {
-  window.shmobx = shmobx;
+  window.shmobx = Shmobx;
 } else if (typeof module !== 'undefined') {
-  module.exports = shmobx;
+  module.exports = Shmobx;
 }
