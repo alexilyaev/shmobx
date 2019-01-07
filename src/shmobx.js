@@ -56,24 +56,84 @@ class Events {
       .forEach(handler => handler());
   }
 
+  static dispatchTransaction(changedMap) {
+    const uniqueListeners = new Set();
+
+    changedMap.forEach((changedKeys, target) => {
+      const targetMap = Events.listeners.get(target);
+
+      if (!targetMap) {
+        return;
+      }
+
+      changedKeys.forEach(changedKey => {
+        const targetKeyListeners = targetMap.get(changedKey);
+
+        if (!targetKeyListeners) {
+          return;
+        }
+
+        targetKeyListeners.forEach(listener => uniqueListeners.add(listener));
+      });
+    });
+
+    uniqueListeners.forEach(handler => handler());
+  }
+
   static removeListener(target, key, handler) {
-    Events.listeners
-      .get(target)
-      .get(key)
-      .delete(handler);
+    const targetMap = Events.listeners.get(target);
+
+    if (!targetMap || !targetMap.has(key)) {
+      return;
+    }
+
+    const targetKeyListeners = targetMap.get(key);
+
+    targetKeyListeners.delete(handler);
+
+    // Cleanup ghost references
+    if (targetKeyListeners.size === 0) {
+      targetMap.delete(key);
+    }
+    if (targetMap.size === 0) {
+      Events.listeners.delete(target);
+    }
   }
 }
 
 class Shmobx {
-  static isRegisterMode = false;
+  static inRegisterMode = false;
+  static inTransactionMode = false;
   static currRegisterMap = new Map();
+  static currTransactionMap = new Map();
 
-  static _setupObservableObj(obj) {
-    return new Proxy(obj, {
+  static _wrapNestedVal(target, key, val) {
+    if (isPlainObject(val) || Array.isArray(val)) {
+      target[key] = Shmobx.observable(val);
+    }
+  }
+
+  static observable(data) {
+    if (!isPlainObject(data) && !Array.isArray(data)) {
+      throw new Error('Currently supporting only Object and Array');
+    }
+
+    if (Array.isArray(data)) {
+      data.forEach((val, key) => {
+        Shmobx._wrapNestedVal(data, key, val);
+      });
+    }
+    if (isPlainObject(data)) {
+      Object.entries(data).forEach(([key, val]) => {
+        Shmobx._wrapNestedVal(data, key, val);
+      });
+    }
+
+    return new Proxy(data, {
       get(target, key) {
-        // console.log('GET', key);
+        // console.log('GET', target, key);
 
-        if (Shmobx.isRegisterMode) {
+        if (Shmobx.inRegisterMode) {
           let targetTrackedKeys = Shmobx.currRegisterMap.get(target);
 
           if (!targetTrackedKeys) {
@@ -88,33 +148,38 @@ class Shmobx {
         return Reflect.get(...arguments);
       },
 
-      set(target, key) {
-        // console.log('SET', key, value);
+      /* eslint-disable-next-line no-unused-vars */
+      set(target, key, value) {
+        // console.log('SET', target, key, value);
 
         const res = Reflect.set(...arguments);
 
-        Events.dispatch(target, key);
+        Shmobx._wrapNestedVal(target, key, value);
+
+        if (Shmobx.inTransactionMode) {
+          let targetTrackedKeys = Shmobx.currTransactionMap.get(target);
+
+          if (!targetTrackedKeys) {
+            targetTrackedKeys = Shmobx.currTransactionMap
+              .set(target, new Set())
+              .get(target);
+          }
+
+          targetTrackedKeys.add(key);
+        } else {
+          Events.dispatch(target, key);
+        }
 
         return res;
       }
     });
   }
 
-  static observable(data) {
-    if (isPlainObject(data)) {
-      return Shmobx._setupObservableObj(data);
-    }
-
-    return data;
-  }
-
   static autorun(func) {
     function handler() {
-      Shmobx.isRegisterMode = true;
-
+      Shmobx.inRegisterMode = true;
       func();
-
-      Shmobx.isRegisterMode = false;
+      Shmobx.inRegisterMode = false;
 
       // Add listeners
       Shmobx.currRegisterMap.forEach((trackedKeys, target) => {
@@ -144,6 +209,15 @@ class Shmobx {
     }
 
     handler();
+  }
+
+  static transaction(func) {
+    Shmobx.inTransactionMode = true;
+    func();
+    Shmobx.inTransactionMode = false;
+
+    Events.dispatchTransaction(Shmobx.currTransactionMap);
+    Shmobx.currTransactionMap = new Map();
   }
 }
 
