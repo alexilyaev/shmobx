@@ -1,7 +1,4 @@
-// const arrayTag = '[object Array]';
 // const funcTag = '[object Function]';
-// const numberTag = '[object Number]';
-// const stringTag = '[object String]';
 const objectTag = '[object Object]';
 
 function isObjectLike(value) {
@@ -107,9 +104,9 @@ class Shmobx {
   static currRegisterMap = new Map();
   static currTransactionMap = new Map();
 
-  static _wrapNestedVal(target, key, val) {
-    if (isPlainObject(val) || Array.isArray(val)) {
-      target[key] = Shmobx.observable(val);
+  static _wrapNestedValue(target, key, value) {
+    if (isPlainObject(value) || Array.isArray(value)) {
+      target[key] = Shmobx.observable(value);
     }
   }
 
@@ -119,13 +116,13 @@ class Shmobx {
     }
 
     if (Array.isArray(data)) {
-      data.forEach((val, key) => {
-        Shmobx._wrapNestedVal(data, key, val);
+      data.forEach((value, key) => {
+        Shmobx._wrapNestedValue(data, key, value);
       });
     }
     if (isPlainObject(data)) {
-      Object.entries(data).forEach(([key, val]) => {
-        Shmobx._wrapNestedVal(data, key, val);
+      Object.entries(data).forEach(([key, value]) => {
+        Shmobx._wrapNestedValue(data, key, value);
       });
     }
 
@@ -154,7 +151,7 @@ class Shmobx {
 
         const res = Reflect.set(...arguments);
 
-        Shmobx._wrapNestedVal(target, key, value);
+        Shmobx._wrapNestedValue(target, key, value);
 
         if (Shmobx.inTransactionMode) {
           let targetTrackedKeys = Shmobx.currTransactionMap.get(target);
@@ -175,40 +172,76 @@ class Shmobx {
     });
   }
 
+  static _trackTargets(handler) {
+    // Add listeners
+    Shmobx.currRegisterMap.forEach((trackedKeys, target) => {
+      trackedKeys.forEach(key => {
+        Events.on(target, key, handler);
+      });
+    });
+
+    // Remove no longer needed listeners
+    if (handler.prevRegisterMap) {
+      handler.prevRegisterMap.forEach((prevTrackedKeys, prevTarget) => {
+        const currTargetTrackedKeys = Shmobx.currRegisterMap.get(prevTarget);
+
+        prevTrackedKeys.forEach(prevTrackedKey => {
+          if (
+            !currTargetTrackedKeys ||
+            !currTargetTrackedKeys.has(prevTrackedKey)
+          ) {
+            Events.removeListener(prevTarget, prevTrackedKey, handler);
+          }
+        });
+      });
+    }
+
+    handler.prevRegisterMap = Shmobx.currRegisterMap;
+    Shmobx.currRegisterMap = new Map();
+  }
+
   static autorun(func) {
     function handler() {
       Shmobx.inRegisterMode = true;
       func();
       Shmobx.inRegisterMode = false;
 
-      // Add listeners
-      Shmobx.currRegisterMap.forEach((trackedKeys, target) => {
-        trackedKeys.forEach(key => {
-          Events.on(target, key, handler);
-        });
-      });
-
-      // Remove no longer needed listeners
-      if (handler.prevRegisterMap) {
-        handler.prevRegisterMap.forEach((prevTrackedKeys, prevTarget) => {
-          const currTargetTrackedKeys = Shmobx.currRegisterMap.get(prevTarget);
-
-          prevTrackedKeys.forEach(prevTrackedKey => {
-            if (
-              !currTargetTrackedKeys ||
-              !currTargetTrackedKeys.has(prevTrackedKey)
-            ) {
-              Events.removeListener(prevTarget, prevTrackedKey, handler);
-            }
-          });
-        });
-      }
-
-      handler.prevRegisterMap = Shmobx.currRegisterMap;
-      Shmobx.currRegisterMap = new Map();
+      Shmobx._trackTargets(handler);
     }
 
     handler();
+  }
+
+  static reaction(dataFunc, effectFunc, options = {}) {
+    let isFirstRun = !options.fireImmediately;
+
+    function handler() {
+      Shmobx.inRegisterMode = true;
+
+      const res = dataFunc();
+
+      Shmobx.inRegisterMode = false;
+
+      Shmobx._trackTargets(handler);
+
+      if (!isFirstRun) {
+        effectFunc(res, handler);
+
+        return;
+      }
+
+      isFirstRun = false;
+    }
+
+    handler.dispose = () => {
+      // Will untrack everything we previously tracked in dataFunc since
+      // Shmobx.currRegisterMap will be empty
+      Shmobx._trackTargets(handler);
+    };
+
+    handler();
+
+    return handler.dispose;
   }
 
   static transaction(func) {

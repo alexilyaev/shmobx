@@ -361,7 +361,7 @@ describe('Index', () => {
   });
 
   describe('reaction', () => {
-    it('should register reaction handlers', () => {
+    it('should register reaction handlers: basic', () => {
       const initial = {
         count: 1,
         name: 'John'
@@ -391,7 +391,39 @@ describe('Index', () => {
       expect(handler).toHaveBeenCalledTimes(1);
     });
 
-    it('should unregister reaction handlers when the reaction is disposed', () => {
+    it('should register reaction handlers: fireImmediately', () => {
+      const initial = {
+        count: 1,
+        name: 'John'
+      };
+      const data = m.observable(initial);
+      let runs = 0;
+
+      const dataFunc = jest.fn(() => {
+        return data.count;
+      });
+      const handler = jest.fn(count => {
+        runs++;
+        expect(count).toBe(runs === 1 ? 1 : 2);
+
+        return [data.count, data.name];
+      });
+
+      m.reaction(dataFunc, handler, { fireImmediately: true });
+
+      expect(dataFunc).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      data.name = 'Robin';
+      expect(dataFunc).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      data.count = 2;
+      expect(dataFunc).toHaveBeenCalledTimes(2);
+      expect(handler).toHaveBeenCalledTimes(2);
+    });
+
+    it('should unregister reaction handlers: reaction dispose', () => {
       const initial = {
         count: 1,
         name: 'John'
@@ -407,20 +439,51 @@ describe('Index', () => {
         return [data.count, data.name];
       });
 
-      const disposer = m.reaction(dataFunc, handler);
+      const reactionDisposer = m.reaction(dataFunc, handler);
 
       data.count = 2;
       expect(dataFunc).toHaveBeenCalledTimes(2);
       expect(handler).toHaveBeenCalledTimes(1);
 
-      disposer();
+      reactionDisposer();
 
       data.count = 3;
       expect(dataFunc).toHaveBeenCalledTimes(2);
       expect(handler).toHaveBeenCalledTimes(1);
     });
 
-    it('should unregister reaction handlers when no longer needed', () => {
+    it('should unregister reaction handlers: effect func dispose', () => {
+      const initial = {
+        count: 1,
+        name: 'John'
+      };
+      const data = m.observable(initial);
+
+      const dataFunc = jest.fn(() => {
+        return data.count;
+      });
+      const handler = jest.fn((count, reaction) => {
+        expect(count).toBe(2);
+
+        if (count === 2) {
+          reaction.dispose();
+        }
+
+        return [data.count, data.name];
+      });
+
+      m.reaction(dataFunc, handler);
+
+      data.count = 2;
+      expect(dataFunc).toHaveBeenCalledTimes(2);
+      expect(handler).toHaveBeenCalledTimes(1);
+
+      data.count = 3;
+      expect(dataFunc).toHaveBeenCalledTimes(2);
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it('should unregister reaction handlers: tracked keys change', () => {
       const initial = {
         count: 1,
         name: 'John'
