@@ -285,6 +285,58 @@ describe('Index', () => {
         ]);
       });
     });
+
+    describe('dispose', () => {
+      it('should unregister autorun handlers: disposer', () => {
+        const initial = {
+          count: 1,
+          name: 'John'
+        };
+        const data = m.observable(initial);
+
+        const handler = jest.fn(() => {
+          return data.count;
+        });
+
+        const autorunDisposer = m.autorun(handler);
+
+        expect(handler).toHaveBeenCalledTimes(1);
+
+        autorunDisposer();
+        data.count = 2;
+
+        expect(handler).toHaveBeenCalledTimes(1);
+      });
+
+      it('should unregister autorun handlers: reaction dispose', () => {
+        const initial = {
+          count: 1,
+          name: 'John'
+        };
+        const data = m.observable(initial);
+        let runs = 0;
+
+        const handler = jest.fn(reaction => {
+          runs++;
+
+          if (runs === 2) {
+            reaction.dispose();
+          }
+
+          return data.count;
+        });
+
+        m.autorun(handler);
+
+        expect(handler).toHaveBeenCalledTimes(1);
+
+        data.count = 2;
+        expect(handler).toHaveBeenCalledTimes(2);
+
+        data.count = 3;
+        expect(handler).toHaveBeenCalledTimes(2);
+      });
+    });
   });
 
   describe('transaction', () => {

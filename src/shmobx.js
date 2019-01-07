@@ -30,14 +30,14 @@ class Events {
     if (!Events.listeners.has(target)) {
       Events.listeners.set(target, new Map());
     }
-    if (!Events.listeners.get(target).has(key)) {
-      Events.listeners.get(target).set(key, new Set());
-    }
 
-    Events.listeners
-      .get(target)
-      .get(key)
-      .add(handler);
+    const targetListeners = Events.listeners.get(target);
+
+    if (targetListeners.has(key)) {
+      targetListeners.get(key).add(handler);
+    } else {
+      targetListeners.set(key, new Set([handler]));
+    }
   }
 
   static dispatch(target, key) {
@@ -47,10 +47,7 @@ class Events {
       return;
     }
 
-    Events.listeners
-      .get(target)
-      .get(key)
-      .forEach(handler => handler());
+    targetMap.get(key).forEach(handler => handler());
   }
 
   static dispatchTransaction(changedMap) {
@@ -66,11 +63,9 @@ class Events {
       changedKeys.forEach(changedKey => {
         const targetKeyListeners = targetMap.get(changedKey);
 
-        if (!targetKeyListeners) {
-          return;
+        if (targetKeyListeners) {
+          targetKeyListeners.forEach(listener => uniqueListeners.add(listener));
         }
-
-        targetKeyListeners.forEach(listener => uniqueListeners.add(listener));
       });
     });
 
@@ -115,37 +110,28 @@ class Shmobx {
       throw new Error('Currently supporting only Object and Array');
     }
 
-    if (Array.isArray(data)) {
-      data.forEach((value, key) => {
-        Shmobx._wrapNestedValue(data, key, value);
-      });
-    }
-    if (isPlainObject(data)) {
-      Object.entries(data).forEach(([key, value]) => {
-        Shmobx._wrapNestedValue(data, key, value);
-      });
-    }
+    // Will work for both Objects and Arrays
+    Object.keys(data).forEach(key => {
+      Shmobx._wrapNestedValue(data, key, data[key]);
+    });
 
     return new Proxy(data, {
       get(target, key) {
         // console.log('GET', target, key);
 
         if (Shmobx.inRegisterMode) {
-          let targetTrackedKeys = Shmobx.currRegisterMap.get(target);
+          const targetTrackedKeys = Shmobx.currRegisterMap.get(target);
 
-          if (!targetTrackedKeys) {
-            targetTrackedKeys = Shmobx.currRegisterMap
-              .set(target, new Set())
-              .get(target);
+          if (targetTrackedKeys) {
+            targetTrackedKeys.add(key);
+          } else {
+            Shmobx.currRegisterMap.set(target, new Set([key]));
           }
-
-          targetTrackedKeys.add(key);
         }
 
         return Reflect.get(...arguments);
       },
 
-      /* eslint-disable-next-line no-unused-vars */
       set(target, key, value) {
         // console.log('SET', target, key, value);
 
@@ -154,15 +140,13 @@ class Shmobx {
         Shmobx._wrapNestedValue(target, key, value);
 
         if (Shmobx.inTransactionMode) {
-          let targetTrackedKeys = Shmobx.currTransactionMap.get(target);
+          const targetTrackedKeys = Shmobx.currTransactionMap.get(target);
 
-          if (!targetTrackedKeys) {
-            targetTrackedKeys = Shmobx.currTransactionMap
-              .set(target, new Set())
-              .get(target);
+          if (targetTrackedKeys) {
+            targetTrackedKeys.add(key);
+          } else {
+            Shmobx.currTransactionMap.set(target, new Set([key]));
           }
-
-          targetTrackedKeys.add(key);
         } else {
           Events.dispatch(target, key);
         }
@@ -200,16 +184,30 @@ class Shmobx {
     Shmobx.currRegisterMap = new Map();
   }
 
+  static _createDisposer(handler) {
+    // Will untrack everything we previously tracked since
+    // Shmobx.currRegisterMap will be empty
+    return () => {
+      // Handle calling `dispose` inside autorun/reaction
+      Shmobx.inRegisterMode = false;
+
+      Shmobx._trackTargets(handler);
+    };
+  }
+
   static autorun(func) {
     function handler() {
       Shmobx.inRegisterMode = true;
-      func();
+      func(handler);
       Shmobx.inRegisterMode = false;
 
       Shmobx._trackTargets(handler);
     }
 
+    handler.dispose = Shmobx._createDisposer(handler);
     handler();
+
+    return handler.dispose;
   }
 
   static reaction(dataFunc, effectFunc, options = {}) {
@@ -233,12 +231,7 @@ class Shmobx {
       isFirstRun = false;
     }
 
-    handler.dispose = () => {
-      // Will untrack everything we previously tracked in dataFunc since
-      // Shmobx.currRegisterMap will be empty
-      Shmobx._trackTargets(handler);
-    };
-
+    handler.dispose = Shmobx._createDisposer(handler);
     handler();
 
     return handler.dispose;
@@ -249,8 +242,10 @@ class Shmobx {
     func();
     Shmobx.inTransactionMode = false;
 
-    Events.dispatchTransaction(Shmobx.currTransactionMap);
+    const transactionMapCopy = new Map(Shmobx.currTransactionMap);
+
     Shmobx.currTransactionMap = new Map();
+    Events.dispatchTransaction(transactionMapCopy);
   }
 }
 
