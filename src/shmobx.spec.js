@@ -1,6 +1,8 @@
 const m = require('./shmobx');
 // const m = require('mobx');
 
+const noop = () => {};
+
 describe('Index', () => {
   describe('basic', () => {
     it('should proxy object mutations', () => {
@@ -64,6 +66,7 @@ describe('Index', () => {
 
         expect(handler).toHaveBeenCalledTimes(1);
 
+        // Not observed by the autorun
         data.name = 'Robin';
         expect(handler).toHaveBeenCalledTimes(1);
 
@@ -76,7 +79,7 @@ describe('Index', () => {
         });
       });
 
-      it('should register autorun handlers: non existing key', () => {
+      it('should register autorun handlers: tracking non existing keys', () => {
         const data = m.observable({});
 
         const handler = jest.fn(() => {
@@ -117,12 +120,14 @@ describe('Index', () => {
 
         expect(handler).toHaveBeenCalledTimes(1);
 
+        // Not tracked at this point, so won't trigger autorun
         data.name = 'Robin';
         expect(handler).toHaveBeenCalledTimes(1);
 
         data.count = 2;
         expect(handler).toHaveBeenCalledTimes(2);
 
+        // No longer tracked after the 1st run, so won't trigger
         data.count = 3;
         expect(handler).toHaveBeenCalledTimes(2);
 
@@ -154,6 +159,7 @@ describe('Index', () => {
 
         expect(handler).toHaveBeenCalledTimes(1);
 
+        // Both are not tracked at this point
         data1.name = 'Robin';
         data2.name = 'Robin';
         expect(handler).toHaveBeenCalledTimes(1);
@@ -161,6 +167,7 @@ describe('Index', () => {
         data1.count = 2;
         expect(handler).toHaveBeenCalledTimes(2);
 
+        // No longer tracked
         data1.count = 3;
         expect(handler).toHaveBeenCalledTimes(2);
 
@@ -209,9 +216,14 @@ describe('Index', () => {
 
         expect(handler).toHaveBeenCalledTimes(1);
 
+        // The `id` key is not tracked anywhere
+        data[2].id = 33;
+        expect(handler).toHaveBeenCalledTimes(1);
+
         data[2].name = 'Jake';
         expect(handler).toHaveBeenCalledTimes(2);
 
+        // `foo` not tracked anywhere
         data[2].foo = null;
         expect(handler).toHaveBeenCalledTimes(2);
 
@@ -224,7 +236,7 @@ describe('Index', () => {
         expect(data).toEqual([
           { id: 1, name: 'John' },
           { id: 2, name: 'Robin' },
-          { id: 3, name: 'Jake', foo: null },
+          { id: 33, name: 'Jake', foo: null },
           { id: 4, name: 'Loki' }
         ]);
       });
@@ -234,7 +246,7 @@ describe('Index', () => {
         const data = m.observable(initial);
 
         const handler = jest.fn(() => {
-          return data.map(nums => nums.join(''));
+          return data.map(nums => nums.forEach(noop));
         });
 
         m.autorun(handler);
@@ -276,6 +288,7 @@ describe('Index', () => {
         data.pop();
         expect(handler).toHaveBeenCalledTimes(3);
 
+        // `janeProxy` object is no longer in `data`, so in no longer tracked
         janeProxy.name = 'Jane';
         expect(handler).toHaveBeenCalledTimes(3);
 
@@ -348,7 +361,8 @@ describe('Index', () => {
       const data = m.observable(initial);
 
       const handler = jest.fn(() => {
-        return [data.count, data.name];
+        // Track all properties of `data`
+        return Object.values(data);
       });
 
       m.autorun(handler);
@@ -404,7 +418,10 @@ describe('Index', () => {
       m.autorun(handler);
 
       m.transaction(() => {
+        // Makes several mutations cause it needs to move items from the end to
+        // Fill the place of the removed item
         data.splice(1, 1);
+        // Same as with `splice`
         data.shift();
       });
       expect(handler).toHaveBeenCalledTimes(2);
@@ -434,6 +451,7 @@ describe('Index', () => {
       expect(dataFunc).toHaveBeenCalledTimes(1);
       expect(handler).not.toHaveBeenCalled();
 
+      // `name` not tracked in `dataFunc`
       data.name = 'Robin';
       expect(dataFunc).toHaveBeenCalledTimes(1);
       expect(handler).not.toHaveBeenCalled();
@@ -466,6 +484,7 @@ describe('Index', () => {
       expect(dataFunc).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledTimes(1);
 
+      // `name` not tracked in `dataFunc`
       data.name = 'Robin';
       expect(dataFunc).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledTimes(1);
@@ -559,6 +578,7 @@ describe('Index', () => {
       expect(dataFunc).toHaveBeenCalledTimes(1);
       expect(handler).not.toHaveBeenCalled();
 
+      // Not tracked at this point
       data.name = 'Robin';
       expect(dataFunc).toHaveBeenCalledTimes(1);
       expect(handler).not.toHaveBeenCalled();
@@ -567,6 +587,7 @@ describe('Index', () => {
       expect(dataFunc).toHaveBeenCalledTimes(2);
       expect(handler).toHaveBeenCalledTimes(1);
 
+      // No longer tracked
       data.count = 3;
       expect(dataFunc).toHaveBeenCalledTimes(2);
       expect(handler).toHaveBeenCalledTimes(1);

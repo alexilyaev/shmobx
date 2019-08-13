@@ -1,4 +1,8 @@
-// const funcTag = '[object Function]';
+/**
+ * This implementation was built for learning purposes only.
+ * If you use it in production, well, you're a Schmuck.
+ */
+
 const objectTag = '[object Object]';
 
 function isObjectLike(value) {
@@ -211,24 +215,23 @@ class Shmobx {
   }
 
   static reaction(dataFunc, effectFunc, options = {}) {
-    let isFirstRun = !options.fireImmediately;
+    let isFirstRun = true;
 
     function handler() {
       Shmobx.inRegisterMode = true;
 
-      const res = dataFunc();
+      const data = dataFunc();
 
       Shmobx.inRegisterMode = false;
-
       Shmobx._trackTargets(handler);
 
-      if (!isFirstRun) {
-        effectFunc(res, handler);
-
-        return;
+      if (!isFirstRun || options.fireImmediately) {
+        effectFunc(data, handler);
       }
 
-      isFirstRun = false;
+      if (isFirstRun) {
+        isFirstRun = false;
+      }
     }
 
     handler.dispose = Shmobx._createDisposer(handler);
