@@ -156,7 +156,7 @@ class Shmobx {
         }
 
         return res;
-      }
+      },
     });
   }
 

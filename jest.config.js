@@ -5,5 +5,5 @@ module.exports = {
   verbose: true,
   restoreMocks: true,
   resetMocks: true,
-  resetModules: true
+  resetModules: true,
 };

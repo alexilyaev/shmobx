@@ -8,7 +8,7 @@ describe('Index', () => {
     it('should proxy object mutations', () => {
       const initial = {
         count: 1,
-        name: 'John'
+        name: 'John',
       };
       const data = m.observable(initial);
 
@@ -54,7 +54,7 @@ describe('Index', () => {
       it('should register autorun handlers: basic', () => {
         const initial = {
           count: 1,
-          name: 'John'
+          name: 'John',
         };
         const data = m.observable(initial);
 
@@ -75,7 +75,7 @@ describe('Index', () => {
 
         expect(data).toEqual({
           count: 2,
-          name: 'Robin'
+          name: 'Robin',
         });
       });
 
@@ -98,14 +98,14 @@ describe('Index', () => {
 
         expect(data).toEqual({
           count: 2,
-          name: 'Robin'
+          name: 'Robin',
         });
       });
 
       it('should unregister autorun handlers: track different key', () => {
         const initial = {
           count: 1,
-          name: 'John'
+          name: 'John',
         };
         const data = m.observable(initial);
         let runsCount = 0;
@@ -136,16 +136,16 @@ describe('Index', () => {
 
         expect(data).toEqual({
           count: 3,
-          name: 'Jane'
+          name: 'Jane',
         });
       });
 
       it('should unregister autorun handlers: track different target', () => {
         const data1 = m.observable({
-          count: 1
+          count: 1,
         });
         const data2 = m.observable({
-          name: 'John'
+          name: 'John',
         });
         let runsCount = 0;
 
@@ -204,7 +204,7 @@ describe('Index', () => {
         const initial = [
           { id: 1, name: 'John' },
           { id: 2, name: 'Robin' },
-          { id: 3, name: 'Jane' }
+          { id: 3, name: 'Jane' },
         ];
         const data = m.observable(initial);
 
@@ -237,7 +237,7 @@ describe('Index', () => {
           { id: 1, name: 'John' },
           { id: 2, name: 'Robin' },
           { id: 33, name: 'Jake', foo: null },
-          { id: 4, name: 'Loki' }
+          { id: 4, name: 'Loki' },
         ]);
       });
 
@@ -269,7 +269,7 @@ describe('Index', () => {
         const initial = [
           { id: 1, name: 'John' },
           { id: 2, name: 'Robin' },
-          { id: 3, name: 'Jane' }
+          { id: 3, name: 'Jane' },
         ];
         const data = m.observable(initial);
         const janeProxy = data[2];
@@ -294,7 +294,7 @@ describe('Index', () => {
 
         expect(data).toEqual([
           { id: 1, name: 'John' },
-          { id: 2, name: 'Robin' }
+          { id: 2, name: 'Robin' },
         ]);
       });
     });
@@ -303,7 +303,7 @@ describe('Index', () => {
       it('should unregister autorun handlers: disposer', () => {
         const initial = {
           count: 1,
-          name: 'John'
+          name: 'John',
         };
         const data = m.observable(initial);
 
@@ -324,7 +324,7 @@ describe('Index', () => {
       it('should unregister autorun handlers: reaction dispose', () => {
         const initial = {
           count: 1,
-          name: 'John'
+          name: 'John',
         };
         const data = m.observable(initial);
         let runs = 0;
@@ -356,7 +356,7 @@ describe('Index', () => {
     it('should combine multiple mutations and notify once', () => {
       const initial = {
         count: 1,
-        name: 'John'
+        name: 'John',
       };
       const data = m.observable(initial);
 
@@ -376,16 +376,16 @@ describe('Index', () => {
 
       expect(data).toEqual({
         count: 2,
-        name: 'Robin'
+        name: 'Robin',
       });
     });
 
     it('should handle different tracked objects and multiple listeners', () => {
       const data1 = m.observable({
-        count: 1
+        count: 1,
       });
       const data2 = m.observable({
-        name: 'John'
+        name: 'John',
       });
 
       const handler1 = jest.fn(() => {
@@ -433,7 +433,7 @@ describe('Index', () => {
     it('should register reaction handlers: basic', () => {
       const initial = {
         count: 1,
-        name: 'John'
+        name: 'John',
       };
       const data = m.observable(initial);
 
@@ -464,7 +464,7 @@ describe('Index', () => {
     it('should register reaction handlers: fireImmediately', () => {
       const initial = {
         count: 1,
-        name: 'John'
+        name: 'John',
       };
       const data = m.observable(initial);
       let runs = 0;
@@ -497,7 +497,7 @@ describe('Index', () => {
     it('should unregister reaction handlers: reaction dispose', () => {
       const initial = {
         count: 1,
-        name: 'John'
+        name: 'John',
       };
       const data = m.observable(initial);
 
@@ -526,7 +526,7 @@ describe('Index', () => {
     it('should unregister reaction handlers: effect func dispose', () => {
       const initial = {
         count: 1,
-        name: 'John'
+        name: 'John',
       };
       const data = m.observable(initial);
 
@@ -557,7 +557,7 @@ describe('Index', () => {
     it('should unregister reaction handlers: tracked keys change', () => {
       const initial = {
         count: 1,
-        name: 'John'
+        name: 'John',
       };
       const data = m.observable(initial);
       let runsCount = 0;
